@@ -19,6 +19,8 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "spi.h"
+#include "tim.h"
 #include "usart.h"
 #include "gpio.h"
 
@@ -87,17 +89,56 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
+  MX_SPI1_Init();
+  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+	  uint8_t tx[3];
+	  uint8_t rx[3];
+	  uint16_t adc_value;
+	  uint16_t pwm;
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  // Build SPI command
+	  tx[0] = 0x01; //start bit
+	  tx[1] = (0x08 | 0) << 4;   // Channel 0, single-ended (1) (shift 4 bits left for 0x1000 0000)
+	  tx[2] = 0x00;
+
+	  // set CS low to talk
+	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
+
+	  // SPI
+	  HAL_SPI_TransmitReceive(&hspi1, tx, rx, 3, HAL_MAX_DELAY);
+
+	  // set CS high to stop talking
+	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
+
+	  // decode the 10-bit ADC value from rx (for 16 bit value, rx[2]
+	  //  has values for first 8 bits, and first 2 bits of rx[1], shifted
+	  //   for positions greater than 8)
+	  adc_value = ((rx[1] & 0x03) << 8) | rx[2];
+
+	  // Map ADC to PWM range (1–2 ms)
+	  // maximum number from 10 bits = 1023, so the ADC value will range from 0 to 1023.
+	  // This ADC value must be converted into a number of timer counts that produces
+	  // a PWM on-time between 1 ms and 2 ms, which corresponds to a 5–10% duty cycle
+	  // for a 20 ms period (50 Hz PWM).
+
+	  // Since 1 ms corresponds to 1000 timer counts and 2 ms corresponds to 2000
+	  // timer counts, the ADC value is linearly mapped to this range.
+	  pwm = 1000 + ((adc_value * 1000) / 1023);
+
+	  // set PWM duty cycle to counter value (using the compare function)
+	  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, pwm);
+
+	  HAL_Delay(10);
   }
   /* USER CODE END 3 */
 }
