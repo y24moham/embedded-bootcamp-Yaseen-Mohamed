@@ -122,7 +122,7 @@ int main(void)
 
 	  // decode the 10-bit ADC value from rx (for 16 bit value, rx[2]
 	  //  has values for first 8 bits, and first 2 bits of rx[1], shifted
-	  //   for positions greater than 8)
+	  //   to positions of bit 9 and 10)
 	  adc_value = ((rx[1] & 0x03) << 8) | rx[2];
 
 	  // Map ADC to PWM range (1–2 ms)
@@ -142,7 +142,8 @@ int main(void)
 	  // map the adc value to the pwm range (pwm is min to max range, and adc range is 1023 (10 bit))
 	  pwm = pwmMin + ((adc_value * pwmRange) / 1023);
 
-	  // set PWM duty cycle to counter value (using the compare function)
+	  // set PWM duty cycle to counter value (using the compare function to set CCR to pwm,
+	  //  which sets that pwm number of counts to high, and the rest to low for that period)
 	  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, pwm);
 
 	  HAL_Delay(10);
