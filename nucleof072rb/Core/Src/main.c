@@ -108,7 +108,7 @@ int main(void)
     /* USER CODE BEGIN 3 */
 	  // Build SPI command
 	  tx[0] = 0x01; //start bit
-	  tx[1] = (0x08 | 0) << 4;   // Channel 0, single-ended (1) (shift 4 bits left for 0x1000 0000)
+	  tx[1] = 0x80;   // Channel 0, single-ended (1 on the 8th bit) 0x1000 0000
 	  tx[2] = 0x00;
 
 	  // set CS low to talk
@@ -131,9 +131,16 @@ int main(void)
 	  // a PWM on-time between 1 ms and 2 ms, which corresponds to a 5–10% duty cycle
 	  // for a 20 ms period (50 Hz PWM).
 
-	  // Since 1 ms corresponds to 1000 timer counts and 2 ms corresponds to 2000
-	  // timer counts, the ADC value is linearly mapped to this range.
-	  pwm = 1000 + ((adc_value * 1000) / 1023);
+	  // the ADC value is linearly mapped to the 5-10% pwm cycle range.
+	  // get the period of the timer
+	  uint32_t periodCounts = htim1.Init.Period;
+	  // min and max pwm (5-10% duty cycle, 50HZ is 20ms period, .05 = 1/20, .1 = 1/10)
+	  uint32_t pwmMin = periodCounts / 20;
+	  uint32_t pwmMax = periodCounts / 10;
+	  uint32_t pwmRange = pwmMax - pwmMin;
+
+	  // map the adc value to the pwm range (pwm is min to max range, and adc range is 1023 (10 bit))
+	  pwm = pwmMin + ((adc_value * pwmRange) / 1023);
 
 	  // set PWM duty cycle to counter value (using the compare function)
 	  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, pwm);
